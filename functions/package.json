@@ -1,6 +1,6 @@
 {
-    "name": "functions",
-    "description": "Cloud Functions for Firebase",
+    "name": "cities-deadlines-v2-functions",
+    "private": true,
     "scripts": {
         "serve": "firebase emulators:start --only functions",
         "shell": "firebase functions:shell",
@@ -18,6 +18,5 @@
     },
     "devDependencies": {
         "firebase-functions-test": "^0.1.6"
-    },
-    "private": true
+    }
 }
