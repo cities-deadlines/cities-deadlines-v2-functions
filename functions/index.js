@@ -1,13 +1,9 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-var serviceAccount = require('../private-key.json');
 var cors = require('cors')({ origin: true });
 
 // initialize app 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: 'https://cities-deadlines.firebaseio.com'
-});
+admin.initializeApp(functions.config().firebase);
 const db = admin.firestore();
 
 // initialize constants
