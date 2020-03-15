@@ -1,9 +1,13 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+var serviceAccount = require('../private-key.json');
 var cors = require('cors')({ origin: true });
 
 // initialize app 
-admin.initializeApp(functions.config().firebase);
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: 'https://cities-deadlines.firebaseio.com'
+});
 const db = admin.firestore();
 
 // initialize constants
@@ -27,7 +31,7 @@ exports.addUser = functions.auth.user().onCreate(user => {
 /*** PROPERTY FUNCTIONS ***/
 
 // (HTTP) purchase property for user
-exports.purchaseProperty = functions.https.onRequest(async (req, res) => {
+exports.purchaseProperty = functions.https.onRequest(async (request, response) => {
     try {
 
         // handle preflight
@@ -55,12 +59,15 @@ exports.purchaseProperty = functions.https.onRequest(async (req, res) => {
         const propertyRef = db.collection('properties').doc(propertyId);
         await db.runTransaction(transaction => {
             return transaction.getAll(buyerRef, propertyRef).then(docs => {
-                [buyer, property] = docs;
+                const buyerDoc = docs[0];
+                const propertyDoc = docs[1];
 
                 // verify documents
-                if (!buyer.exists) throw new Error('buyer-f');
-                else if (!property.exists) throw new Error('prop-f');
+                if (!buyerDoc.exists) throw new Error('buyer-f');
+                else if (!propertyDoc.exists) throw new Error('prop-f');
                 else {
+                    const buyer = buyerDoc.data();
+                    const property = propertyDoc.data();
 
                     // verify balance
                     if (buyer.balance < property.price) 
