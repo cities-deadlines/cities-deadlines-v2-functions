@@ -1,6 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-var cors = require('cors')({ origin: true });
+const stripe = require('stripe')('sk_test_6unolxOGoLeFa0qg7XIiPVIs00lsFgpfK3');
+const cors = require('cors')({ origin: true });
 
 // initialize app 
 admin.initializeApp(functions.config().firebase);
@@ -42,7 +43,7 @@ exports.purchaseProperty = functions.https.onRequest(async (request, response) =
         const token = request.get('Authorization');
         if (!token) throw new Error('auth-r');
         await admin.auth().verifyIdToken(token).then(
-            decoded => { userId = decoded.user_id; }, 
+            decoded => { userId = decoded.user_id; },
             err => { throw new Error('auth-f'); }
         );
 
@@ -66,7 +67,7 @@ exports.purchaseProperty = functions.https.onRequest(async (request, response) =
                     const property = propertyDoc.data();
 
                     // verify balance
-                    if (buyer.balance < property.price) 
+                    if (buyer.balance < property.price)
                         throw new Error('balance');
 
                     // verify ownership
@@ -94,7 +95,7 @@ exports.purchaseProperty = functions.https.onRequest(async (request, response) =
                             price: property.price,
                             timestamp: admin.firestore.FieldValue.serverTimestamp()
                         });
-                        
+
                         // update buyer
                         transaction.update(buyerRef, {
                             balance: admin.firestore.FieldValue.increment(-property.price),
@@ -109,7 +110,7 @@ exports.purchaseProperty = functions.https.onRequest(async (request, response) =
                     }
                 }
             });
-        }); 
+        });
 
         // return https response
         cors(request, response, () => {
@@ -121,7 +122,7 @@ exports.purchaseProperty = functions.https.onRequest(async (request, response) =
         var message = '';
 
         // select error message
-        switch(err.message) {
+        switch (err.message) {
             case 'auth-r': message = 'Error authenticating user. Please refresh page.'; break;
             case 'auth-f': message = 'Error authenticating user. Please refresh page.'; break;
             case 'prop-r': message = 'Error retrieving property. Please wait and try again.'; break;
@@ -133,10 +134,65 @@ exports.purchaseProperty = functions.https.onRequest(async (request, response) =
         }
 
         cors(request, response, () => {
-            response.send({ 
+            response.send({
                 success: false,
                 message: message
             });
+        });
+    }
+});
+
+
+
+/*** PAYMENT FUNCTIONS ***/
+
+exports.startPayment = functions.https.onRequest(async (request, response) => {
+    try {
+
+        // handle preflight
+        if (request.method == 'OPTIONS') {
+            return cors(request, response, () => {
+                response.send({ success: true });
+            });
+        }
+
+        // enforce authentication
+        var userId = undefined;
+        const token = request.get('Authorization');
+        if (!token) throw new Error('auth-r');
+        await admin.auth().verifyIdToken(token).then(
+            decoded => { userId = decoded.uid; },
+            err => { throw new Error('auth-f'); }
+        );
+
+        // create stripe session
+        const session = await stripe.checkout.sessions.create({
+            client_reference_id: userId,
+            payment_method_types: ['card'],
+            line_items: [{
+                name: 'Add Balance',
+                description: 'Purchase balance that will instantly be loaded into your account.',
+                images: [],
+                amount: 100,
+                currency: 'usd',
+                quantity: 1
+            }],
+            success_url: 'http://localhost:3000/',
+            cancel_url: 'http://localhost:3000/'
+        });
+
+        // return https response
+        cors(request, response, () => {
+            response.send({ 
+                success: true,
+                session: session
+            });
+        });
+    }
+    catch (err) {
+        console.log('startPayment: ' + err);
+        cors(request, response, () => {
+            response.send({ success: false });
         });
     }
 });
