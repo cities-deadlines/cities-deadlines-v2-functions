@@ -171,7 +171,6 @@ exports.startPayment = functions.https.onRequest(async (request, response) => {
             payment_method_types: ['card'],
             line_items: [{
                 name: 'Add Balance',
-                description: 'Purchase balance that will instantly be loaded into your account.',
                 images: [],
                 amount: 100,
                 currency: 'usd',
@@ -187,6 +186,39 @@ exports.startPayment = functions.https.onRequest(async (request, response) => {
                 success: true,
                 session: session
             });
+        });
+    }
+    catch (err) {
+        console.log('startPayment: ' + err);
+        cors(request, response, () => {
+            response.send({ success: false });
+        });
+    }
+});
+
+exports.receivePayment = functions.https.onRequest(async (request, response) => {
+    try {
+
+        // handle preflight
+        if (request.method == 'OPTIONS') {
+            return cors(request, response, () => {
+                response.send({ success: true });
+            });
+        }
+
+        // construct stripe event
+        const event = stripe.webhooks.constructEvent(
+            request.rawBody.toString('utf8'), 
+            request.get('stripe-signature'), 
+            'whsec_AA7FLHXg9mVbeJtXZOhKSEMFxBkN80Fa'
+        );
+        
+        // handle completed session
+        const session = event.data.object;
+
+        // return https response
+        cors(request, response, () => {
+            response.send({ success: true });
         });
     }
     catch (err) {
